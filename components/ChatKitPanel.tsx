@@ -11,6 +11,7 @@ import {
   getThemeConfig,
 } from "@/lib/config";
 import { ErrorOverlay } from "./ErrorOverlay";
+import { SettingsModal } from "./SettingsModal";
 import type { ColorScheme } from "@/hooks/useColorScheme";
 
 export type FactAction = {
@@ -43,6 +44,8 @@ const createInitialErrors = (): ErrorState => ({
   retryable: false,
 });
 
+const CUSTOM_PROMPT_STORAGE_KEY = "chatkit_custom_prompt";
+
 export function ChatKitPanel({
   theme,
   onWidgetAction,
@@ -61,6 +64,13 @@ export function ChatKitPanel({
       : "pending"
   );
   const [widgetInstanceKey, setWidgetInstanceKey] = useState(0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState<string>(() => {
+    if (isBrowser) {
+      return localStorage.getItem(CUSTOM_PROMPT_STORAGE_KEY) || "";
+    }
+    return "";
+  });
 
   const setErrorState = useCallback((updates: Partial<ErrorState>) => {
     setErrors((current) => ({ ...current, ...updates }));
@@ -157,6 +167,15 @@ export function ChatKitPanel({
     setWidgetInstanceKey((prev) => prev + 1);
   }, []);
 
+  const handleSavePrompt = useCallback((prompt: string) => {
+    setCustomPrompt(prompt);
+    if (isBrowser) {
+      localStorage.setItem(CUSTOM_PROMPT_STORAGE_KEY, prompt);
+    }
+    // Reset the chat to apply the new prompt
+    handleResetChat();
+  }, [handleResetChat]);
+
   const getClientSecret = useCallback(
     async (currentSecret: string | null) => {
       if (isDev) {
@@ -198,6 +217,7 @@ export function ChatKitPanel({
                 enabled: true,
               },
             },
+            ...(customPrompt && { custom_prompt: customPrompt }),
           }),
         });
 
@@ -258,7 +278,7 @@ export function ChatKitPanel({
         }
       }
     },
-    [isWorkflowConfigured, setErrorState]
+    [isWorkflowConfigured, setErrorState, customPrompt]
   );
 
   const chatkit = useChatKit({
@@ -266,6 +286,13 @@ export function ChatKitPanel({
     theme: {
       colorScheme: theme,
       ...getThemeConfig(theme),
+    },
+    header: {
+      enabled: true,
+      rightAction: {
+        icon: "settings-cog",
+        onClick: () => setIsSettingsOpen(true),
+      },
     },
     startScreen: {
       greeting: GREETING,
@@ -363,6 +390,12 @@ export function ChatKitPanel({
         }
         onRetry={blockingError && errors.retryable ? handleResetChat : null}
         retryLabel="Restart chat"
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentPrompt={customPrompt}
+        onSave={handleSavePrompt}
       />
     </div>
   );

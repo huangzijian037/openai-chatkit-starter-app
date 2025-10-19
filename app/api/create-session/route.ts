@@ -11,6 +11,7 @@ interface CreateSessionRequestBody {
       enabled?: boolean;
     };
   };
+  custom_prompt?: string;
 }
 
 const DEFAULT_CHATKIT_BASE = "https://api.openai.com";
@@ -61,6 +62,32 @@ export async function POST(request: Request): Promise<Response> {
 
     const apiBase = process.env.CHATKIT_API_BASE ?? DEFAULT_CHATKIT_BASE;
     const url = `${apiBase}/v1/chatkit/sessions`;
+    
+    const sessionBody: {
+      workflow: { id: string };
+      user: string;
+      chatkit_configuration: {
+        file_upload: {
+          enabled: boolean;
+        };
+      };
+      additional_instructions?: string;
+    } = {
+      workflow: { id: resolvedWorkflowId },
+      user: userId,
+      chatkit_configuration: {
+        file_upload: {
+          enabled:
+            parsedBody?.chatkit_configuration?.file_upload?.enabled ?? false,
+        },
+      },
+    };
+
+    // Add custom prompt as additional instructions if provided
+    if (parsedBody?.custom_prompt) {
+      sessionBody.additional_instructions = parsedBody.custom_prompt;
+    }
+
     const upstreamResponse = await fetch(url, {
       method: "POST",
       headers: {
@@ -68,16 +95,7 @@ export async function POST(request: Request): Promise<Response> {
         Authorization: `Bearer ${openaiApiKey}`,
         "OpenAI-Beta": "chatkit_beta=v1",
       },
-      body: JSON.stringify({
-        workflow: { id: resolvedWorkflowId },
-        user: userId,
-        chatkit_configuration: {
-          file_upload: {
-            enabled:
-              parsedBody?.chatkit_configuration?.file_upload?.enabled ?? false,
-          },
-        },
-      }),
+      body: JSON.stringify(sessionBody),
     });
 
     if (process.env.NODE_ENV !== "production") {
