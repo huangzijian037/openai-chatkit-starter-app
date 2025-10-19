@@ -217,7 +217,7 @@ export function ChatKitPanel({
                 enabled: true,
               },
             },
-            custom_prompt: customPrompt || undefined,
+            ...(customPrompt && { custom_prompt: customPrompt }),
           }),
         });
 
